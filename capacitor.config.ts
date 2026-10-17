@@ -1,0 +1,1 @@
+const config={appId:'com.gpsai.app',appName:'GPS AI',webDir:'dist'};export default config;
