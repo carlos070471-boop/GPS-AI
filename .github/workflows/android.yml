@@ -19,12 +19,14 @@ jobs:
       - run: npm run build
       - run: npx cap add android
       - run: npx cap sync android
-      - name: Permisos Android
+      - name: Voz nativa y permisos Android
         run: |
+          cp native/MainActivity.java android/app/src/main/java/com/gpsai/app/MainActivity.java
+          cp native/NativeVoicePlugin.java android/app/src/main/java/com/gpsai/app/NativeVoicePlugin.java
           python3 - <<'PY'
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
-          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.INTERNET" />')
+          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>')
           open(p,'w').write(s)
           PY
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
