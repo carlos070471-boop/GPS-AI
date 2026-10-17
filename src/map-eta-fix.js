@@ -3,19 +3,44 @@ const routeInfo=document.getElementById('routeInfo');
 const cancelBtn=document.getElementById('cancelNav');
 let etaSeconds=null,lastEtaUpdate=0;
 
-// La rotación/perspectiva se aplica a una capa exterior. Leaflet conserva #map
-// sin transformaciones CSS propias, de modo que su pinch-zoom trabaja sobre
-// sus teselas sin recortar el lienzo.
+// Capa exterior para rotación/perspectiva. Leaflet mantiene #map sin
+// transformaciones propias para que zoom, teselas y gestos sigan funcionando.
 const stage=document.createElement('div');
 stage.id='mapStage';
 mapEl.parentNode.insertBefore(stage,mapEl);
 stage.appendChild(mapEl);
 
-const styleProto=CSSStyleDeclaration.prototype;
-const transformDesc=Object.getOwnPropertyDescriptor(styleProto,'transform');
-if(transformDesc?.set&&transformDesc?.get){
+// main.js escribe transform sobre #map. Redirigimos esas escrituras al stage.
+// Se definen descriptores propios simples para que funcione también en Android WebView.
+try{
   Object.defineProperty(mapEl.style,'transform',{configurable:true,get(){return stage.style.transform||''},set(v){stage.style.transform=v||''}});
   Object.defineProperty(mapEl.style,'transformOrigin',{configurable:true,get(){return stage.style.transformOrigin||''},set(v){stage.style.transformOrigin=v||''}});
+}catch(e){
+  console.warn('No se pudo instalar proxy de transformación',e);
+}
+
+// Respaldo explícito para el botón 3D: después del manejador de main.js,
+// garantiza que la perspectiva quede aplicada al stage aunque el WebView
+// no permita interceptar CSSStyleDeclaration.
+const view3dBtn=document.getElementById('view3d');
+if(view3dBtn){
+  view3dBtn.addEventListener('click',()=>{
+    setTimeout(()=>{
+      const active=mapEl.classList.contains('perspective');
+      if(active){
+        const current=stage.style.transform||'';
+        if(!current.includes('perspective(')){
+          const rotate=current.match(/rotate\([^)]*\)/)?.[0]||'rotate(0deg)';
+          stage.style.transform=`perspective(700px) rotateX(36deg) ${rotate} scale(1.18)`;
+          stage.style.transformOrigin='center 62%';
+        }
+      }else{
+        stage.style.transform=(stage.style.transform.match(/rotate\([^)]*\)/)?.[0]||'rotate(0deg)');
+        stage.style.transformOrigin='center center';
+      }
+      window.dispatchEvent(new Event('resize'));
+    },0);
+  });
 }
 
 const etaBox=document.createElement('div');
