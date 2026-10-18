@@ -19,14 +19,26 @@ jobs:
       - run: npm run build
       - run: npx cap add android
       - run: npx cap sync android
-      - name: Voz nativa y permisos Android
+      - name: Voz nativa, permisos y Android Auto
         run: |
           cp native/MainActivity.java android/app/src/main/java/com/gpsai/app/MainActivity.java
           cp native/NativeVoicePlugin.java android/app/src/main/java/com/gpsai/app/NativeVoicePlugin.java
+          mkdir -p android/app/src/main/java/com/gpsai/app/car
+          cp native/car/*.java android/app/src/main/java/com/gpsai/app/car/
+          mkdir -p android/app/src/main/res/xml
+          cp native/automotive_app_desc.xml android/app/src/main/res/xml/automotive_app_desc.xml
           python3 - <<'PY'
+          p='android/app/build.gradle'
+          s=open(p).read()
+          marker='dependencies {'
+          s=s.replace(marker, marker+'\n    implementation "androidx.car.app:app:1.7.0"\n    implementation "androidx.car.app:app-projected:1.7.0"',1)
+          open(p,'w').write(s)
+
           p='android/app/src/main/AndroidManifest.xml'
           s=open(p).read()
-          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>')
+          s=s.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">','<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />\n    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />\n    <queries><intent><action android:name="android.intent.action.TTS_SERVICE" /></intent></queries>')
+          service='''\n        <meta-data android:name="com.google.android.gms.car.application" android:resource="@xml/automotive_app_desc" />\n        <service android:name="com.gpsai.app.car.GpsAiCarAppService" android:exported="true">\n            <intent-filter>\n                <action android:name="androidx.car.app.CarAppService" />\n                <category android:name="androidx.car.app.category.NAVIGATION" />\n            </intent-filter>\n        </service>\n'''
+          s=s.replace('</application>',service+'    </application>')
           open(p,'w').write(s)
           PY
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
