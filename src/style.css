@@ -4,3 +4,6 @@
 
 /* Nombre de vía siempre horizontal, bajo la posición del vehículo */
 #currentRoadLabel{position:fixed;z-index:2300;left:50%;top:calc(50% + 30px);transform:translateX(-50%);max-width:min(84vw,340px);padding:7px 12px;background:rgba(255,255,255,.94);border-radius:13px;box-shadow:0 2px 10px #0004;color:#202020;font-size:14px;font-weight:800;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;writing-mode:horizontal-tb;direction:ltr}#currentRoadLabel.hidden{display:none!important}
+
+/* Menú de tres rayas, justo debajo de la lupa */
+#openMenu{position:absolute;right:0;top:54px;width:46px;height:46px;border:0;border-radius:50%;background:white;color:#222;box-shadow:0 3px 14px #0003;font-size:25px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer}#quickMenu{position:absolute;right:0;top:106px;margin-top:0;width:174px;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.98);border-radius:15px;padding:7px;box-shadow:0 3px 18px #0003}#quickMenu.hidden{display:none!important}#quickMenu button{width:100%;text-align:left;box-shadow:none;background:transparent;font-size:12px}#quickMenu button:active{background:#eee}#savedMenu{position:absolute;right:0;top:106px;width:min(330px,calc(100vw - 28px));margin-top:0}#savedMenu.hidden{display:none!important}
