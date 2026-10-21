@@ -11,3 +11,6 @@ Aplicación Android de navegación GPS con mapa, búsqueda de destinos y cálcul
 - Base preparada para añadir navegación guiada, incidencias y funciones de IA.
 
 Proyecto iniciado el 17 de octubre de 2026.
+
+## Compilación
+La APK Android se genera automáticamente con GitHub Actions al actualizar la rama principal. Incluye los indicadores de velocidad GPS y límite de vía cuando haya datos disponibles.
