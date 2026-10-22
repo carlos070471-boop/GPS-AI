@@ -33,3 +33,26 @@
 #satelliteMode.active,#northMode.active,#locate:active{background:transparent!important}
 #satelliteMode.active svg,#northMode.active svg{filter:drop-shadow(0 0 4px #67bbff) drop-shadow(0 2px 3px #0005)}
 #view3d{display:none!important}
+
+/* Elevated controls: keep clear of the trip information card. */
+#locate,.trip-active #locate{bottom:265px}
+#northMode,.trip-active #northMode{bottom:331px}
+#satelliteMode,.trip-active #satelliteMode{bottom:397px}
+#satelliteMode svg,#northMode svg,#locate svg{
+ width:52px;height:52px;filter:drop-shadow(1px 0 #e1242e) drop-shadow(-1px 0 #e1242e) drop-shadow(0 1px #e1242e) drop-shadow(0 -1px #e1242e) drop-shadow(0 2px 2px #ffffff);
+}
+#mapZoom,.trip-active #mapZoom{
+ position:fixed;left:16px;bottom:265px;z-index:2100;
+ display:flex;flex-direction:column;gap:8px;
+ border-radius:0;overflow:visible;box-shadow:none!important;background:transparent!important;
+}
+#mapZoom button,.trip-active #mapZoom button{
+ width:60px;height:60px;min-width:60px;border:0!important;
+ background:transparent!important;color:#176df1!important;
+ font-size:52px;font-family:Arial,sans-serif;font-weight:900;line-height:1;
+ -webkit-text-stroke:1.4px #e1242e;
+ text-shadow:1px 0 #e1242e,-1px 0 #e1242e,0 1px #e1242e,0 -1px #e1242e,0 2px 3px #fff;
+ box-shadow:none!important;border-radius:0;display:flex;align-items:center;justify-content:center;
+ touch-action:manipulation;
+}
+#mapZoom button+button{border-top:0!important}
