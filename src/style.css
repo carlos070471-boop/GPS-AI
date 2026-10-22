@@ -16,3 +16,20 @@
 
 /* WebGL 3D view: separate surface, Leaflet remains available for 2D. */
 #map3d{position:absolute;inset:0;width:100%;height:100%;visibility:hidden;pointer-events:none;z-index:5;background:#e6e9ed}#map3d.visible{visibility:visible;pointer-events:auto}.gps3d-user{width:21px;height:21px;background:#2375ff;border:4px solid white;border-radius:50%;box-shadow:0 1px 9px #0009}.gps3d-dest{width:23px;height:23px;background:#d71920;border:4px solid white;border-radius:50%;box-shadow:0 1px 9px #0009}
+
+/* Compact floating icon-only controls, no white discs. */
+#satelliteMode,#northMode,#locate,
+.trip-active #satelliteMode,.trip-active #northMode,.trip-active #locate{
+ position:fixed;right:16px;width:58px;min-width:58px;height:58px;
+ padding:5px;border:0;border-radius:0;background:transparent!important;
+ box-shadow:none!important;color:inherit;display:flex;align-items:center;
+ justify-content:center;z-index:2100;touch-action:manipulation;
+}
+#locate,.trip-active #locate{bottom:145px}
+#northMode,.trip-active #northMode{bottom:208px}
+#satelliteMode,.trip-active #satelliteMode{bottom:271px}
+#satelliteMode svg,#northMode svg,#locate svg{display:block;width:48px;height:48px;overflow:visible;filter:drop-shadow(0 1px 2px #ffffff) drop-shadow(0 2px 3px #0004)}
+#satelliteMode::before,#satelliteMode::after,#northMode::before,#northMode::after{content:none!important;display:none!important}
+#satelliteMode.active,#northMode.active,#locate:active{background:transparent!important}
+#satelliteMode.active svg,#northMode.active svg{filter:drop-shadow(0 0 4px #67bbff) drop-shadow(0 2px 3px #0005)}
+#view3d{display:none!important}
