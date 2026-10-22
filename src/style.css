@@ -25,9 +25,9 @@
  box-shadow:none!important;color:inherit;display:flex;align-items:center;
  justify-content:center;z-index:2100;touch-action:manipulation;
 }
-#locate,.trip-active #locate{bottom:145px}
-#northMode,.trip-active #northMode{bottom:208px}
-#satelliteMode,.trip-active #satelliteMode{bottom:271px}
+#locate,.trip-active #locate{bottom:185px}
+#northMode,.trip-active #northMode{bottom:248px}
+#satelliteMode,.trip-active #satelliteMode{bottom:311px}
 #satelliteMode svg,#northMode svg,#locate svg{display:block;width:48px;height:48px;overflow:visible;filter:drop-shadow(0 1px 2px #ffffff) drop-shadow(0 2px 3px #0004)}
 #satelliteMode::before,#satelliteMode::after,#northMode::before,#northMode::after{content:none!important;display:none!important}
 #satelliteMode.active,#northMode.active,#locate:active{background:transparent!important}
