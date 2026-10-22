@@ -56,3 +56,16 @@
  touch-action:manipulation;
 }
 #mapZoom button+button{border-top:0!important}
+
+/* Saved destinations must float above the entire map and all route overlays. */
+#app > #savedMenu{
+ position:fixed!important;z-index:5000!important;
+ top:max(116px,calc(env(safe-area-inset-top) + 100px))!important;
+ right:14px!important;left:auto!important;
+ width:min(360px,calc(100vw - 28px))!important;
+ max-height:min(62vh,520px);overflow-y:auto;
+ background:#fff!important;border-radius:16px;
+ box-shadow:0 8px 28px #0005;
+}
+#app > #savedMenu.hidden{display:none!important}
+#app > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
