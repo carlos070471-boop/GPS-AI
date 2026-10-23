@@ -107,3 +107,18 @@ body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywher
   width:44px;height:44px;
   filter:none!important;
 }
+
+
+/* Nombre de la vía fijo bajo el vehículo, horizontal incluso al girar el mapa 2D. */
+#currentRoadLabel{
+ position:fixed!important;
+ left:50%!important;
+ top:calc(50% + 36px)!important;
+ transform:translateX(-50%)!important;
+ writing-mode:horizontal-tb!important;
+ text-orientation:mixed!important;
+ white-space:nowrap!important;
+ max-width:calc(100vw - 110px)!important;
+ z-index:2400!important;
+ pointer-events:none!important;
+}
