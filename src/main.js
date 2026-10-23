@@ -46,7 +46,41 @@ function applyMapView(h=lastHeading){
 function touchAngle(t){const a=t[0],b=t[1];return Math.atan2(b.clientY-a.clientY,b.clientX-a.clientX)*180/Math.PI}mapEl.addEventListener('touchstart',e=>{if(e.touches.length===2){gestureActive=true;gestureStartAngle=touchAngle(e.touches);gestureStartRotation=manualRotation}},{passive:true});mapEl.addEventListener('touchmove',e=>{if(e.touches.length===2&&gestureStartAngle!==null){manualRotation=gestureStartRotation+(touchAngle(e.touches)-gestureStartAngle);applyMapView(lastHeading)}},{passive:true});mapEl.addEventListener('touchend',e=>{if(e.touches.length<2){gestureActive=false;gestureStartAngle=null}},{passive:true});mapEl.addEventListener('touchcancel',()=>{gestureActive=false;gestureStartAngle=null},{passive:true});
 function roadFromRoute(pos){let best=null,bestD=Infinity;for(const s of currentSteps){if(!s.name)continue;const l=s.maneuver?.location;if(!l)continue;const d=distanceM(pos,[l[1],l[0]]);if(d<bestD){bestD=d;best=s.name}}return bestD<500?best:null}function showRoadLabel(pos,name){const label=document.getElementById('currentRoadLabel');if(label){label.textContent=name||lastRoadName||'Identificando vía…';label.classList.toggle('hidden',!navActive)}if(roadLabel){map.removeLayer(roadLabel);roadLabel=null}}async function updateRoadName(pos){const routeName=roadFromRoute(pos);if(routeName){lastRoadName=routeName;showRoadLabel(pos,routeName)}const now=Date.now();if(now-lastRoadCheck<12000)return;lastRoadCheck=now;try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&lat=${pos[0]}&lon=${pos[1]}`),d=await r.json(),a=d.address||{},name=a.road||a.pedestrian||a.footway||a.cycleway||a.path||a.motorway||a.trunk||a.neighbourhood||routeName;if(name){lastRoadName=name;showRoadLabel(pos,name)}}catch{if(lastRoadName)showRoadLabel(pos,lastRoadName)}}
 function closeSavedOverlay(){savedMenu.classList.add('hidden');quickMenu?.classList.add('hidden');menuToggle?.setAttribute('aria-expanded','false')}
-function endTrip(arrived=false){navActive=false;document.body.classList.remove('trip-active');document.getElementById('app').classList.remove('trip-active');savedMenu.classList.add('hidden');closeSavedOverlay();document.getElementById('currentRoadLabel')?.classList.add('hidden');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}speedPanel.classList.add('hidden');nextTurn.classList.add('hidden');cancelBtn.classList.add('hidden');startBtn.classList.add('hidden');finishBtn.classList.remove('hidden');finishBtn.textContent='VIAJE FINALIZADO';lastHeading=0;manualRotation=0;applyMapView(0);speak(arrived?'Has llegado a tu destino. Viaje finalizado.':'Viaje cancelado.')}function voiceGuide(pos){if(!navActive||!currentSteps.length)return;const rem=currentDest?distanceM(pos,currentDest):Infinity;if(rem<30){endTrip(true);return}const n=nearestStep(pos);if(!n)return;const s=n.step,d=n.distance,key=`${s.maneuver?.location?.join(',')}-${s.maneuver?.type}-${s.maneuver?.modifier}`,now=Date.now();let text='';if(s.maneuver?.type==='arrive'&&d<35)text='Has llegado a tu destino';else if(d<=30)text=`En ${Math.max(10,Math.round(d/10)*10)} metros, ${instruction(s)}`;else if(d<=120)text=`En ${Math.round(d/10)*10} metros, ${instruction(s)}`;else if(d<=350)text=`En ${Math.round(d/50)*50} metros, ${instruction(s)}`;if(text&&key!==lastSpokenKey&&now-lastSpokenAt>5000){lastSpokenKey=key;lastSpokenAt=now;speak(text)}}async function updateRoadLimit(pos){const now=Date.now();if(now-lastLimitCheck<12000)return;lastLimitCheck=now;try{const q=`[out:json][timeout:12];way(around:45,${pos[0]},${pos[1]})[highway][maxspeed];out geom;`;const r=await fetch('https://overpass.kumi.systems/api/interpreter?data='+encodeURIComponent(q),{signal:AbortSignal.timeout(14000)});if(!r.ok)throw Error('Overpass');const d=await r.json();const meters=(a,b)=>distanceM(a,b);function segmentDistance(p,a,b){const lat=Math.PI*p[0]/180,kx=111320*Math.cos(lat),ky=111320;const x=(p[1]-a[1])*kx,y=(p[0]-a[0])*ky,dx=(b[1]-a[1])*kx,dy=(b[0]-a[0])*ky,t=Math.max(0,Math.min(1,(x*dx+y*dy)/(dx*dx+dy*dy||1)));return Math.hypot(x-t*dx,y-t*dy)}const matches=(d.elements||[]).map(w=>{const raw=String(w.tags?.['maxspeed:forward']||w.tags?.maxspeed||'');const n=Number(raw.match(/\d+/)?.[0]);const limit=raw.toLowerCase().includes('mph')?Math.round(n*1.609344):n;const pts=(w.geometry||[]).map(p=>[p.lat,p.lon]);let dist=Infinity;for(let i=1;i<pts.length;i++)dist=Math.min(dist,segmentDistance(pos,pts[i-1],pts[i]));return {limit,dist}}).filter(x=>x.limit>=10&&x.limit<=140&&x.dist<=30).sort((a,b)=>a.dist-b.dist);speedLimit=matches.length?matches[0].limit:null;speedLimitEl.textContent=speedLimit??'--'}catch{speedLimit=null;speedLimitEl.textContent='--'}}function updateSpeed(p){let kmh=null;if(Number.isFinite(p.coords.speed)&&p.coords.speed>=0)kmh=Math.round(p.coords.speed*3.6);else if(lastGpsPos&&p.timestamp&&window.__gpsLastTime&&p.timestamp>window.__gpsLastTime&&p.coords.accuracy<=40){const dt=(p.timestamp-window.__gpsLastTime)/1000;if(dt>=1&&dt<=12)kmh=Math.round(distanceM(lastGpsPos,[p.coords.latitude,p.coords.longitude])/dt*3.6)}window.__gpsLastTime=p.timestamp||Date.now();currentSpeedEl.textContent=kmh==null?'--':kmh;const over=kmh!=null&&speedLimit!=null&&kmh>speedLimit+2;limitSign.classList.toggle('over',over);currentSign.classList.toggle('over',over);if(over&&(!wasOverLimit||Date.now()-lastSpeedWarn>45000)){lastSpeedWarn=Date.now();speak('Has superado el límite de velocidad permitido')}wasOverLimit=over}function setPosition(p,c=false){userPos=[p.coords.latitude,p.coords.longitude];if(userMarker)userMarker.setLatLng(userPos);else userMarker=L.circleMarker(userPos,{radius:11,weight:4,fillOpacity:1}).addTo(map).bindPopup('Tu ubicación');if(roadLabel)roadLabel.setLatLng(userPos);if(c)map.setView(userPos,17);if(is3d)sync3dCamera()}async function locate(){try{const p=await new Promise((ok,no)=>navigator.geolocation.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:12000,maximumAge:3000}));setPosition(p,true);lastGpsPos=[...userPos]}catch(e){if(e?.code!==1)alert('No se ha podido obtener la ubicación. Comprueba que el GPS esté activado.')}}
+function endTrip(arrived=false){navActive=false;document.body.classList.remove('trip-active');document.getElementById('app').classList.remove('trip-active');savedMenu.classList.add('hidden');closeSavedOverlay();document.getElementById('currentRoadLabel')?.classList.add('hidden');if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}speedPanel.classList.add('hidden');nextTurn.classList.add('hidden');cancelBtn.classList.add('hidden');startBtn.classList.add('hidden');finishBtn.classList.remove('hidden');finishBtn.textContent='VIAJE FINALIZADO';lastHeading=0;manualRotation=0;applyMapView(0);speak(arrived?'Has llegado a tu destino. Viaje finalizado.':'Viaje cancelado.')}function voiceGuide(pos){if(!navActive||!currentSteps.length)return;const rem=currentDest?distanceM(pos,currentDest):Infinity;if(rem<30){endTrip(true);return}const n=nearestStep(pos);if(!n)return;const s=n.step,d=n.distance,key=`${s.maneuver?.location?.join(',')}-${s.maneuver?.type}-${s.maneuver?.modifier}`,now=Date.now();let text='';if(s.maneuver?.type==='arrive'&&d<35)text='Has llegado a tu destino';else if(d<=30)text=`En ${Math.max(10,Math.round(d/10)*10)} metros, ${instruction(s)}`;else if(d<=120)text=`En ${Math.round(d/10)*10} metros, ${instruction(s)}`;else if(d<=350)text=`En ${Math.round(d/50)*50} metros, ${instruction(s)}`;if(text&&key!==lastSpokenKey&&now-lastSpokenAt>5000){lastSpokenKey=key;lastSpokenAt=now;speak(text)}}async function updateRoadLimit(pos){
+ const now=Date.now();if(now-lastLimitCheck<9000)return;lastLimitCheck=now;
+ try{
+  const q='[out:json][timeout:9];way(around:65,'+pos[0]+','+pos[1]+')[highway];out geom;';
+  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),10500);
+  let response;
+  try{response=await fetch('https://overpass.kumi.systems/api/interpreter?data='+encodeURIComponent(q),{signal:ctrl.signal});}
+  finally{clearTimeout(timer)}
+  if(!response.ok)throw Error('speed query failed');
+  const data=await response.json();
+  function segmentDistance(p,a,b){
+   const kx=111320*Math.cos(p[0]*Math.PI/180),ky=111320;
+   const x=(p[1]-a[1])*kx,y=(p[0]-a[0])*ky,dx=(b[1]-a[1])*kx,dy=(b[0]-a[0])*ky;
+   const t=Math.max(0,Math.min(1,(x*dx+y*dy)/(dx*dx+dy*dy||1)));
+   return Math.hypot(x-t*dx,y-t*dy);
+  }
+  const matches=(data.elements||[]).map(w=>{
+   const tags=w.tags||{},raw=String(tags.maxspeed||tags['maxspeed:forward']||tags['maxspeed:backward']||'').toLowerCase();
+   let n=Number(raw.match(/^\s*(\d+(?:\.\d+)?)/)?.[1]);
+   if(raw.includes('mph'))n=Math.round(n*1.609344);
+   if(!Number.isFinite(n)||n<10||n>140)n=null;
+   const pts=(w.geometry||[]).map(p=>[p.lat,p.lon]);let dist=Infinity;
+   for(let i=1;i<pts.length;i++)dist=Math.min(dist,segmentDistance(pos,pts[i-1],pts[i]));
+   return {limit:n,dist,road:tags.highway};
+  }).filter(x=>x.dist<=35).sort((a,b)=>a.dist-b.dist);
+  // Never invent a speed limit from the road class: signs and local rules may differ.
+  const match=matches.find(x=>x.limit!==null);
+  speedLimit=match?.limit??null;
+  speedLimitEl.textContent=speedLimit??'--';
+ }catch{
+  // Preserve the last known value briefly rather than falsely showing a new limit.
+  speedLimitEl.textContent=speedLimit??'--';
+ }
+}
+function updateSpeed(p){let kmh=null;if(Number.isFinite(p.coords.speed)&&p.coords.speed>=0)kmh=Math.round(p.coords.speed*3.6);else if(lastGpsPos&&p.timestamp&&window.__gpsLastTime&&p.timestamp>window.__gpsLastTime&&p.coords.accuracy<=40){const dt=(p.timestamp-window.__gpsLastTime)/1000;if(dt>=1&&dt<=12)kmh=Math.round(distanceM(lastGpsPos,[p.coords.latitude,p.coords.longitude])/dt*3.6)}window.__gpsLastTime=p.timestamp||Date.now();currentSpeedEl.textContent=kmh==null?'--':kmh;const over=kmh!=null&&speedLimit!=null&&kmh>speedLimit+2;limitSign.classList.toggle('over',over);currentSign.classList.toggle('over',over);if(over&&(!wasOverLimit||Date.now()-lastSpeedWarn>45000)){lastSpeedWarn=Date.now();speak('Has superado el límite de velocidad permitido')}wasOverLimit=over}function setPosition(p,c=false){userPos=[p.coords.latitude,p.coords.longitude];if(userMarker)userMarker.setLatLng(userPos);else userMarker=L.circleMarker(userPos,{radius:11,weight:4,fillOpacity:1}).addTo(map).bindPopup('Tu ubicación');if(roadLabel)roadLabel.setLatLng(userPos);if(c)map.setView(userPos,17);if(is3d)sync3dCamera()}async function locate(){try{const p=await new Promise((ok,no)=>navigator.geolocation.getCurrentPosition(ok,no,{enableHighAccuracy:true,timeout:12000,maximumAge:3000}));setPosition(p,true);lastGpsPos=[...userPos]}catch(e){if(e?.code!==1)alert('No se ha podido obtener la ubicación. Comprueba que el GPS esté activado.')}}
 $('#locate').onclick=locate;$('#zoomIn').onclick=()=>{if(is3d&&map3d)map3d.zoomIn();else map.zoomIn(.5)};$('#zoomOut').onclick=()=>{if(is3d&&map3d)map3d.zoomOut();else map.zoomOut(.5)};northBtn.onclick=()=>{northUp=!northUp;manualRotation=0;northBtn.classList.toggle('active',northUp);northBtn.setAttribute('aria-pressed',String(northUp));northBtn.setAttribute('aria-label',northUp?'Desactivar orientación norte':'Orientar mapa al norte');applyMapView(lastHeading)};view3d.onclick=()=>{const surface=document.getElementById('map3d');const show2d=()=>{is3d=false;surface.classList.remove('visible');view3d.classList.remove('active');view3d.setAttribute('aria-pressed','false');map.invalidateSize({pan:false});setTimeout(()=>map.invalidateSize({pan:false}),200)};if(is3d){show2d();return}surface.classList.add('visible');if(!ensureMap3d()){show2d();return}is3d=true;view3d.classList.add('active');view3d.setAttribute('aria-pressed','true');let ready=false;let timeout=setTimeout(()=>{if(is3d&&!ready){show2d();alert('No se ha podido cargar el mapa 3D. Se ha restaurado la vista 2D.')}},9000);const onReady=()=>{ready=true;clearTimeout(timeout);if(is3d){map3d.resize();sync3dCamera()}};map3d.once('idle',onReady);requestAnimationFrame(()=>{if(!is3d)return;map3d.resize();sync3dCamera();setTimeout(()=>{if(is3d){map3d.resize();sync3dCamera()}},350)})};const menuToggle=$('#openMenu'),quickMenu=$('#quickMenu');function closeQuickMenu(){quickMenu.classList.add('hidden');menuToggle.setAttribute('aria-expanded','false')}menuToggle.onclick=()=>{const opening=quickMenu.classList.contains('hidden');quickMenu.classList.toggle('hidden',!opening);menuToggle.setAttribute('aria-expanded',String(opening));savedMenu.classList.add('hidden')};function openSavedDestinations(kind){
  closeQuickMenu();setSearchOpen(false);savedMenu.classList.add('hidden');
  document.getElementById('gpsaiSavedDialog')?.remove();
@@ -89,24 +123,31 @@ async function searchPlaces(q){
  return searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',q}));
 }
 async function searchNumberedAddress(q){
- const a=numberedAddress(q);
- if(!a)return [];
- const query=[a.road,a.number,a.city].filter(Boolean).join(', ');
- const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',dedupe:'1',q:query});
- const data=await searchFetch(searchEndpoint+'?'+params);
- const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
- const matches=data.filter(x=>{
-  const n=norm(x.address?.house_number),road=norm(x.address?.road||x.address?.pedestrian||x.address?.residential);
-  const city=norm(x.address?.city||x.address?.town||x.address?.village||x.address?.municipality);
-  const requestedCity=norm(a.city.split(',')[0]);
-  return n===a.number&&(!road||road.includes(norm(a.road).replace(/^(avenida|avinguda|calle|carrer|av\.?)\s+/,'').trim()))&&(!requestedCity||!city||city.includes(requestedCity));
- });
- if(matches.length)return matches;
- // Try structured geocoding, without silently substituting a different house number.
- const structured=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',street:a.number+' '+a.road});
- if(a.city)structured.set('city',a.city.split(',')[0]);
- const fallback=await searchFetch(searchEndpoint+'?'+structured);
- return fallback.filter(x=>norm(x.address?.house_number)===a.number);
+ const a=numberedAddress(q);if(!a)return [];
+ const variants=[a.road];
+ const swap=[[/^avenida\b/i,'Avinguda'],[/^avinguda\b/i,'Avenida'],[/^calle\b/i,'Carrer'],[/^carrer\b/i,'Calle'],[/^plaza\b/i,'Plaça'],[/^plaça\b/i,'Plaza'],[/^paseo\b/i,'Passeig'],[/^passeig\b/i,'Paseo']];
+ for(const [re,to] of swap)if(re.test(a.road))variants.push(a.road.replace(re,to));
+ const city=a.city.split(',')[0];
+ const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+ const wanted=normalize(a.road);
+ const requests=[];
+ for(const road of [...new Set(variants)]){
+  requests.push(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',q:[road,a.number,city].filter(Boolean).join(', ')}));
+  requests.push(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',street:a.number+' '+road,...(city?{city}:{})}));
+ }
+ const outcomes=await Promise.allSettled(requests.map(url=>searchFetch(url,6500)));
+ const seen=new Set(),found=[];
+ for(const o of outcomes){
+  if(o.status!=='fulfilled')continue;
+  for(const x of o.value||[]){
+   const number=String(x.address?.house_number||'').toLowerCase().trim();
+   const road=normalize(x.address?.road||x.address?.pedestrian||x.address?.residential||'');
+   if(number!==a.number||road&&road!==wanted&&!road.includes(wanted)&&!wanted.includes(road))continue;
+   const key=x.osm_type+':'+x.osm_id+':'+x.place_id;
+   if(!seen.has(key)){seen.add(key);found.push(x)}
+  }
+ }
+ return found;
 }
 async function searchBusinesses(q){
  if(!userPos||q.trim().length<3)return [];
