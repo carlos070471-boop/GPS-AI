@@ -83,3 +83,27 @@ body > #savedMenu{
 }
 body > #savedMenu.hidden{display:none!important}
 body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+
+
+/* Controles laterales: 10 mm más abajo, fondo negro y contorno rojo. */
+#locate,#northMode,#satelliteMode,
+.trip-active #locate,.trip-active #northMode,.trip-active #satelliteMode{
+  transform:translateY(10mm);
+  background:#000!important;
+  border:2px solid #e1242e!important;
+  border-radius:50%!important;
+  box-shadow:0 2px 6px #0006!important;
+}
+#mapZoom,.trip-active #mapZoom{transform:translateY(10mm)}
+#mapZoom button,.trip-active #mapZoom button{
+  background:#000!important;
+  color:#fff!important;
+  border:2px solid #e1242e!important;
+  border-radius:14px!important;
+  -webkit-text-stroke:0!important;
+  text-shadow:none!important;
+}
+#satelliteMode svg,#northMode svg,#locate svg{
+  width:44px;height:44px;
+  filter:none!important;
+}
