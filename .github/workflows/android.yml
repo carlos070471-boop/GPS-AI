@@ -1,4 +1,5 @@
 name: Compilar APK GPS AI
+# Compilación solicitada para probar los últimos cambios visuales y avisos.
 on:
   workflow_dispatch:
   push:
