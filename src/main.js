@@ -111,6 +111,7 @@ $('#search').onsubmit=async e=>{
   const numbered=numberedAddress(q);
   let data=numbered?await searchNumberedAddress(q):await searchPlaces(q,near);
   if(!numbered&&!data.length)data=await searchPlaces(q);
+  if(userPos){data=data.filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)).sort((a,b)=>distanceM(userPos,[+a.lat,+a.lon])-distanceM(userPos,[+b.lat,+b.lon]));}
   results.replaceChildren();
   data.forEach(x=>{
    const p=formatPlace(x),b=document.createElement('button');b.type='button';b.className='result';
