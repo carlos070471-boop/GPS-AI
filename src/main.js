@@ -80,17 +80,33 @@ async function searchFetch(url,timeout=5500){
  try{const r=await fetch(url,{signal:ctrl.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('Search failed');return await r.json()}finally{clearTimeout(timer)}
 }
 function numberedAddress(q){
- const parts=q.split(',').map(x=>x.trim()),m=parts[0]?.match(/^(.+?)\s+(\d+[A-Za-z]?)$/);
- return m?{street:m[2]+' '+m[1],number:m[2].toLowerCase(),city:parts[1]||''}:null;
+ const parts=q.split(',').map(x=>x.trim()).filter(Boolean);
+ const first=parts[0]||'';
+ const match=first.match(/^(.+?)\s+(?:n[úu]mero\s*|n[º°.]?\s*)?(\d+[A-Za-z]?)$/i);
+ return match?{road:match[1].trim(),number:match[2].toLowerCase(),city:parts.slice(1).join(', ')}:null;
 }
 async function searchPlaces(q){
  return searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',q}));
 }
 async function searchNumberedAddress(q){
- const a=numberedAddress(q),params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',street:a.street});
- if(a.city)params.set('city',a.city);
+ const a=numberedAddress(q);
+ if(!a)return [];
+ const query=[a.road,a.number,a.city].filter(Boolean).join(', ');
+ const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',dedupe:'1',q:query});
  const data=await searchFetch(searchEndpoint+'?'+params);
- return data.filter(x=>String(x.address?.house_number||'').toLowerCase()===a.number);
+ const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+ const matches=data.filter(x=>{
+  const n=norm(x.address?.house_number),road=norm(x.address?.road||x.address?.pedestrian||x.address?.residential);
+  const city=norm(x.address?.city||x.address?.town||x.address?.village||x.address?.municipality);
+  const requestedCity=norm(a.city.split(',')[0]);
+  return n===a.number&&(!road||road.includes(norm(a.road).replace(/^(avenida|avinguda|calle|carrer|av\.?)\s+/,'').trim()))&&(!requestedCity||!city||city.includes(requestedCity));
+ });
+ if(matches.length)return matches;
+ // Try structured geocoding, without silently substituting a different house number.
+ const structured=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',street:a.number+' '+a.road});
+ if(a.city)structured.set('city',a.city.split(',')[0]);
+ const fallback=await searchFetch(searchEndpoint+'?'+structured);
+ return fallback.filter(x=>norm(x.address?.house_number)===a.number);
 }
 async function searchBusinesses(q){
  if(!userPos||q.trim().length<3)return [];
