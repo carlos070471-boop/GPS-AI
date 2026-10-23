@@ -179,3 +179,9 @@ body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywher
 #mapZoom,.trip-active #mapZoom{
  transform:translateY(30mm)!important;
 }
+
+/* Route preview must cover both lateral control groups. Once navigation starts,
+   only the compact cancel control remains, below the lateral buttons. */
+body:not(.trip-active) #routeCard:not(.hidden){z-index:3200!important;isolation:isolate}
+body.trip-active #routeCard{z-index:2000!important;pointer-events:none}
+body.trip-active #routeCard #cancelNav{pointer-events:auto}
