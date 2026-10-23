@@ -81,6 +81,22 @@ async function searchPlaces(q,opts={}){
  if(!response.ok)throw Error('Search failed');
  return response.json();
 }
+function numberedAddress(q){
+ const parts=q.split(',').map(v=>v.trim()).filter(Boolean);
+ const m=parts[0]?.match(/^(.+?)\\s+(\\d+[A-Za-z]?)$/);
+ if(!m)return null;
+ return {street:m[2]+' '+m[1],number:m[2].toLowerCase(),city:parts[1]||'',country:parts.slice(2).join(',')};
+}
+async function searchNumberedAddress(q){
+ const a=numberedAddress(q);if(!a)return null;
+ const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'10',street:a.street});
+ if(a.city)params.set('city',a.city);
+ if(a.country)params.set('country',a.country);
+ const response=await fetch(searchEndpoint+'?'+params,{headers:{Accept:'application/json'}});
+ if(!response.ok)throw Error('Address search failed');
+ const data=await response.json();
+ return data.filter(x=>String(x.address?.house_number||'').toLowerCase()===a.number);
+}
 function formatPlace(x){
  const n=x.namedetails||{};
  const name=x.name||n['name:es']||n.name||x.display_name?.split(',')[0]||'Lugar';
@@ -92,15 +108,16 @@ $('#search').onsubmit=async e=>{
  savedMenu.classList.add('hidden');results.innerHTML='<div class="result">Buscando lugares y direcciones…</div>';
  try{
   const near=userPos?{viewbox:[userPos[1]-.22,userPos[0]+.16,userPos[1]+.22,userPos[0]-.16].join(','),bounded:'0'}:{};
-  let data=await searchPlaces(q,near);
-  if(!data.length)data=await searchPlaces(q);
+  const numbered=numberedAddress(q);
+  let data=numbered?await searchNumberedAddress(q):await searchPlaces(q,near);
+  if(!numbered&&!data.length)data=await searchPlaces(q);
   results.replaceChildren();
   data.forEach(x=>{
    const p=formatPlace(x),b=document.createElement('button');b.type='button';b.className='result';
    b.textContent=p.label;b.title=p.address;
    b.onclick=()=>choose({...x,display_name:p.label});results.appendChild(b);
   });
-  if(!data.length)results.innerHTML='<div class="result">No se ha encontrado. Prueba añadiendo la localidad al nombre del negocio.</div>';
+  if(!data.length)results.innerHTML='<div class="result">'+(numbered?'No se ha encontrado ese número de portal. Comprueba la dirección o prueba otra localidad.':'No se ha encontrado. Prueba añadiendo la localidad al nombre del negocio.')+'</div>';
  }catch{results.innerHTML='<div class="result">Error de búsqueda. Comprueba la conexión e inténtalo de nuevo.</div>'}
 };
 async function choose(x){setSearchOpen(false);closeQuickMenu();savedMenu.classList.add('hidden');const dest=[+x.lat,+x.lon];currentDest=dest;currentName=x.display_name;addRecent({name:currentName,lat:dest[0],lon:dest[1]});refreshFavoriteStar();finishBtn.classList.add('hidden');startBtn.classList.remove('hidden');if(destMarker)destMarker.setLatLng(dest);else destMarker=L.marker(dest).addTo(map);destMarker.bindPopup(x.display_name).openPopup();map.setView(dest,16);if(is3d)sync3dCamera();if(!userPos)await locate();if(userPos)route(dest,x.display_name)}
