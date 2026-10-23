@@ -75,74 +75,72 @@ $('#locate').onclick=locate;$('#zoomIn').onclick=()=>{if(is3d&&map3d)map3d.zoomI
 }$('#recentBtn').onclick=()=>openSavedDestinations('recents');$('#favoritesBtn').onclick=()=>openSavedDestinations('favorites');favoriteCurrent.onclick=()=>{const d=destObj();if(!d)return;if(isFavorite(d))favorites=favorites.filter(x=>!sameDest(x,d));else favorites=[d,...favorites.filter(x=>!sameDest(x,d))];writeStore('gpsai-favorites',favorites);refreshFavoriteStar()};locate();
 const searchForm=$('#search'),searchToggle=$('#openSearch');function setSearchOpen(open){if(open){closeQuickMenu();savedMenu.classList.add('hidden')}searchForm.classList.toggle('hidden',!open);searchToggle.setAttribute('aria-expanded',String(open));if(open)$('#destination').focus();else results.innerHTML=''}searchToggle.onclick=()=>setSearchOpen(searchForm.classList.contains('hidden'));$('#closeSearch').onclick=()=>setSearchOpen(false);
 const searchEndpoint='https://nominatim.openstreetmap.org/search';
-async function searchPlaces(q,opts={}){
- const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'40',dedupe:'0',q,...opts});
- const response=await fetch(searchEndpoint+'?'+params.toString(),{headers:{'Accept':'application/json'}});
- if(!response.ok)throw Error('Search failed');
- return response.json();
-}
-async function searchBusinesses(q){
- if(!userPos)return [];
- const safe=q.trim().replace(/[.*+?^\u0024{}()|[\]\\]/g,'\\function numberedAddress(q){').slice(0,80);
- if(safe.length<3)return [];
- const expr='[out:json][timeout:15];(nwr(around:60000,'+userPos[0]+','+userPos[1]+')[name~"'+safe+'",i];);out center 40;';
- try{
-  const response=await fetch('https://overpass.kumi.systems/api/interpreter?data='+encodeURIComponent(expr),{signal:AbortSignal.timeout(18000)});
-  if(!response.ok)return [];
-  const json=await response.json();
-  return (json.elements||[]).map(e=>{
-   const lat=e.lat??e.center?.lat,lon=e.lon??e.center?.lon,t=e.tags||{};
-   const street=[t['addr:street'],t['addr:housenumber']].filter(Boolean).join(' ');
-   const city=t['addr:city']||t['addr:place']||'';
-   return {lat,lon,name:t.name||q,display_name:[t.name||q,street,city].filter(Boolean).join(', '),address:{road:t['addr:street'],house_number:t['addr:housenumber'],city},place_id:'osm-'+e.type+'-'+e.id};
-  }).filter(e=>Number.isFinite(+e.lat)&&Number.isFinite(+e.lon));
- }catch{return []}
+async function searchFetch(url,timeout=5500){
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeout);
+ try{const r=await fetch(url,{signal:ctrl.signal,headers:{Accept:'application/json'}});if(!r.ok)throw Error('Search failed');return await r.json()}finally{clearTimeout(timer)}
 }
 function numberedAddress(q){
- const parts=q.split(',').map(v=>v.trim()).filter(Boolean);
- const m=parts[0]?.match(/^(.+?)\\s+(\\d+[A-Za-z]?)$/);
- if(!m)return null;
- return {street:m[2]+' '+m[1],number:m[2].toLowerCase(),city:parts[1]||'',country:parts.slice(2).join(',')};
+ const parts=q.split(',').map(x=>x.trim()),m=parts[0]?.match(/^(.+?)\s+(\d+[A-Za-z]?)$/);
+ return m?{street:m[2]+' '+m[1],number:m[2].toLowerCase(),city:parts[1]||''}:null;
+}
+async function searchPlaces(q){
+ return searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',q}));
 }
 async function searchNumberedAddress(q){
- const a=numberedAddress(q);if(!a)return null;
- const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'10',street:a.street});
+ const a=numberedAddress(q),params=new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',street:a.street});
  if(a.city)params.set('city',a.city);
- if(a.country)params.set('country',a.country);
- const response=await fetch(searchEndpoint+'?'+params,{headers:{Accept:'application/json'}});
- if(!response.ok)throw Error('Address search failed');
- const data=await response.json();
+ const data=await searchFetch(searchEndpoint+'?'+params);
  return data.filter(x=>String(x.address?.house_number||'').toLowerCase()===a.number);
 }
+async function searchBusinesses(q){
+ if(!userPos||q.trim().length<3)return [];
+ const safe=q.trim().slice(0,60).replace(/[^a-zA-Z0-9À-ÿ \-]/g,' ').trim();
+ if(!safe)return [];
+ const expr='[out:json][timeout:5];(nwr(around:20000,'+userPos[0]+','+userPos[1]+')[name~"'+safe+'",i];);out center 30;';
+ try{
+  const data=await searchFetch('https://overpass.kumi.systems/api/interpreter?data='+encodeURIComponent(expr),4500);
+  return (data.elements||[]).map(e=>{
+   const t=e.tags||{};
+   return {lat:e.lat??e.center?.lat,lon:e.lon??e.center?.lon,name:t.name||q,display_name:[t.name||q,[t['addr:street'],t['addr:housenumber']].filter(Boolean).join(' '),t['addr:city']].filter(Boolean).join(', '),place_id:'osm-'+e.type+'-'+e.id};
+  }).filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon));
+ }catch{return []}
+}
 function formatPlace(x){
- const n=x.namedetails||{};
- const name=x.name||n['name:es']||n.name||x.display_name?.split(',')[0]||'Lugar';
- const address=x.display_name||'Dirección no disponible';
+ const n=x.namedetails||{},name=x.name||n['name:es']||n.name||x.display_name?.split(',')[0]||'Lugar',address=x.display_name||'Dirección no disponible';
  return {name,address,label:name===address?name:name+' — '+address};
 }
+let searchRequest=0;
 $('#search').onsubmit=async e=>{
  e.preventDefault();const q=$('#destination').value.trim();if(!q)return;
- savedMenu.classList.add('hidden');results.innerHTML='<div class="result">Buscando lugares y direcciones…</div>';
+ const request=++searchRequest;
+ savedMenu.classList.add('hidden');results.innerHTML='<div class="result">Buscando destinos…</div>';
+ const numbered=numberedAddress(q);
  try{
-  const near=userPos?{viewbox:[userPos[1]-.22,userPos[0]+.16,userPos[1]+.22,userPos[0]-.16].join(','),bounded:'0'}:{};
-  const numbered=numberedAddress(q);
-  let data=numbered?await searchNumberedAddress(q):await searchPlaces(q,near);
-  if(!numbered){
-   const globalMatches=await searchPlaces(q);
-   const unique=new Map();
-   for(const x of [...data,...globalMatches])unique.set(x.place_id||`${x.lat},${x.lon},${x.display_name}`,x);
-   if(userPos){for(const x of await searchBusinesses(q))unique.set(x.place_id,x);}
-   data=[...unique.values()];
+  const jobs=[numbered?searchNumberedAddress(q):searchPlaces(q)];
+  if(!numbered&&userPos)jobs.push(searchBusinesses(q));
+  const responses=await Promise.allSettled(jobs);
+  if(request!==searchRequest)return;
+  const unique=new Map();
+  for(const response of responses){
+   if(response.status!=='fulfilled')continue;
+   for(const x of response.value||[]){
+    if(!Number.isFinite(+x.lat)||!Number.isFinite(+x.lon))continue;
+    const key=x.place_id||[x.lat,x.lon,x.display_name].join(',');
+    if(!unique.has(key))unique.set(key,x);
+   }
   }
-  if(userPos){data=data.filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)).sort((a,b)=>distanceM(userPos,[+a.lat,+a.lon])-distanceM(userPos,[+b.lat,+b.lon]));}
+  const data=[...unique.values()];
+  if(userPos)data.sort((a,b)=>distanceM(userPos,[+a.lat,+a.lon])-distanceM(userPos,[+b.lat,+b.lon]));
   results.replaceChildren();
-  data.forEach(x=>{
-   const p=formatPlace(x),b=document.createElement('button');b.type='button';b.className='result';
-   b.textContent=p.label;b.title=p.address;
-   b.onclick=()=>choose({...x,display_name:p.label});results.appendChild(b);
-  });
-  if(!data.length)results.innerHTML='<div class="result">'+(numbered?'No se ha encontrado ese número de portal. Comprueba la dirección o prueba otra localidad.':'No se ha encontrado. Prueba añadiendo la localidad al nombre del negocio.')+'</div>';
- }catch{results.innerHTML='<div class="result">Error de búsqueda. Comprueba la conexión e inténtalo de nuevo.</div>'}
+  for(const x of data){
+   const p=formatPlace(x),button=document.createElement('button');button.type='button';button.className='result';
+   button.textContent=p.label;button.title=p.address;
+   button.onclick=()=>choose({...x,display_name:p.label});results.appendChild(button);
+  }
+  if(!data.length)results.innerHTML='<div class="result">'+(numbered?'No se ha encontrado ese número exacto. Comprueba la dirección.':'No hay resultados disponibles. Prueba el nombre y la localidad.')+'</div>';
+ }catch{
+  if(request===searchRequest)results.innerHTML='<div class="result">No se pudo completar la búsqueda. Comprueba la conexión.</div>';
+ }
 };
 async function choose(x){setSearchOpen(false);closeQuickMenu();savedMenu.classList.add('hidden');const dest=[+x.lat,+x.lon];currentDest=dest;currentName=x.display_name;addRecent({name:currentName,lat:dest[0],lon:dest[1]});refreshFavoriteStar();finishBtn.classList.add('hidden');startBtn.classList.remove('hidden');if(destMarker)destMarker.setLatLng(dest);else destMarker=L.marker(dest).addTo(map);destMarker.bindPopup(x.display_name).openPopup();map.setView(dest,16);if(is3d)sync3dCamera();if(!userPos)await locate();if(userPos)route(dest,x.display_name)}
 async function route(dest,name,fit=true){try{const u=`https://router.project-osrm.org/route/v1/driving/${userPos[1]},${userPos[0]};${dest[1]},${dest[0]}?overview=full&geometries=geojson&steps=true`,r=await fetch(u),d=await r.json();if(!d.routes?.length)throw 0;const rt=d.routes[0],coords=rt.geometry.coordinates.map(c=>[c[1],c[0]]);routeCoords3d=rt.geometry.coordinates;sync3dOverlays();currentSteps=rt.legs.flatMap(l=>l.steps||[]);if(routeLine)map.removeLayer(routeLine);routeLine=L.polyline(coords,{weight:7,opacity:.85}).addTo(map);if(fit)map.fitBounds(routeLine.getBounds(),{padding:[60,60]});if(is3d)sync3dCamera();$('#routeTitle').textContent=name.split(',')[0];info.textContent=`${(rt.distance/1000).toFixed(1)} km · ${Math.round(rt.duration/60)} min`;if(!navActive)startBtn.classList.remove('hidden');card.classList.remove('hidden');return rt}catch{alert('No se ha podido calcular la ruta. Inténtalo de nuevo.')}}
