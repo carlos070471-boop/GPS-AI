@@ -81,6 +81,23 @@ async function searchPlaces(q,opts={}){
  if(!response.ok)throw Error('Search failed');
  return response.json();
 }
+async function searchBusinesses(q){
+ if(!userPos)return [];
+ const safe=q.trim().replace(/[.*+?^\u0024{}()|[\]\\]/g,'\\function numberedAddress(q){').slice(0,80);
+ if(safe.length<3)return [];
+ const expr='[out:json][timeout:15];(nwr(around:60000,'+userPos[0]+','+userPos[1]+')[name~"'+safe+'",i];);out center 40;';
+ try{
+  const response=await fetch('https://overpass.kumi.systems/api/interpreter?data='+encodeURIComponent(expr),{signal:AbortSignal.timeout(18000)});
+  if(!response.ok)return [];
+  const json=await response.json();
+  return (json.elements||[]).map(e=>{
+   const lat=e.lat??e.center?.lat,lon=e.lon??e.center?.lon,t=e.tags||{};
+   const street=[t['addr:street'],t['addr:housenumber']].filter(Boolean).join(' ');
+   const city=t['addr:city']||t['addr:place']||'';
+   return {lat,lon,name:t.name||q,display_name:[t.name||q,street,city].filter(Boolean).join(', '),address:{road:t['addr:street'],house_number:t['addr:housenumber'],city},place_id:'osm-'+e.type+'-'+e.id};
+  }).filter(e=>Number.isFinite(+e.lat)&&Number.isFinite(+e.lon));
+ }catch{return []}
+}
 function numberedAddress(q){
  const parts=q.split(',').map(v=>v.trim()).filter(Boolean);
  const m=parts[0]?.match(/^(.+?)\\s+(\\d+[A-Za-z]?)$/);
@@ -114,6 +131,7 @@ $('#search').onsubmit=async e=>{
    const globalMatches=await searchPlaces(q);
    const unique=new Map();
    for(const x of [...data,...globalMatches])unique.set(x.place_id||`${x.lat},${x.lon},${x.display_name}`,x);
+   if(userPos){for(const x of await searchBusinesses(q))unique.set(x.place_id,x);}
    data=[...unique.values()];
   }
   if(userPos){data=data.filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)).sort((a,b)=>distanceM(userPos,[+a.lat,+a.lon])-distanceM(userPos,[+b.lat,+b.lon]));}
