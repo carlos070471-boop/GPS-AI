@@ -145,3 +145,29 @@ body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywher
  -webkit-text-stroke:1.3px #e1242e!important;
  text-shadow:none!important;
 }
+
+
+/* Iconos laterales: un centímetro más abajo, siluetas negras limpias y sin fondos. */
+#locate,#northMode,#satelliteMode,
+.trip-active #locate,.trip-active #northMode,.trip-active #satelliteMode{
+ transform:translateY(20mm)!important;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;outline:none!important;
+}
+#locate svg,#northMode svg,#satelliteMode svg{
+ width:46px!important;height:46px!important;
+ filter:drop-shadow(0 1px 1px #ffffffb0)!important;
+}
+#locate svg path,#locate svg circle,#northMode svg path,#satelliteMode svg path{
+ stroke:#111!important;
+}
+#locate svg circle[fill],#northMode svg path[fill],#satelliteMode svg path[fill]{
+ fill:#111!important;
+}
+#mapZoom,.trip-active #mapZoom{transform:translateY(20mm)!important}
+#mapZoom button,.trip-active #mapZoom button{
+ background:transparent!important;color:#111!important;border:0!important;
+ border-radius:0!important;box-shadow:none!important;
+ -webkit-text-stroke:0!important;text-shadow:0 1px 1px #fffc!important;
+ font-size:48px!important;font-weight:800!important;
+}
