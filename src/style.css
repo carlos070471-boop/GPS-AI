@@ -122,3 +122,26 @@ body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywher
  z-index:2400!important;
  pointer-events:none!important;
 }
+
+
+/* Botones transparentes: solamente pictogramas negros con contorno rojo. */
+#locate,#northMode,#satelliteMode,
+.trip-active #locate,.trip-active #northMode,.trip-active #satelliteMode{
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;outline:none!important;
+}
+#locate svg,#northMode svg,#satelliteMode svg{
+ filter:drop-shadow(1px 0 #e1242e) drop-shadow(-1px 0 #e1242e) drop-shadow(0 1px #e1242e) drop-shadow(0 -1px #e1242e)!important;
+}
+#locate svg path,#locate svg circle,#northMode svg path,#satelliteMode svg path{
+ stroke:#e1242e!important;
+}
+#locate svg circle[fill],#northMode svg path[fill],#satelliteMode svg path[fill]{
+ fill:#000!important;
+}
+#mapZoom button,.trip-active #mapZoom button{
+ background:transparent!important;color:#000!important;border:0!important;
+ border-radius:0!important;box-shadow:none!important;
+ -webkit-text-stroke:1.3px #e1242e!important;
+ text-shadow:none!important;
+}
