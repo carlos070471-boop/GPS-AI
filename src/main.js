@@ -76,7 +76,7 @@ $('#locate').onclick=locate;$('#zoomIn').onclick=()=>{if(is3d&&map3d)map3d.zoomI
 const searchForm=$('#search'),searchToggle=$('#openSearch');function setSearchOpen(open){if(open){closeQuickMenu();savedMenu.classList.add('hidden')}searchForm.classList.toggle('hidden',!open);searchToggle.setAttribute('aria-expanded',String(open));if(open)$('#destination').focus();else results.innerHTML=''}searchToggle.onclick=()=>setSearchOpen(searchForm.classList.contains('hidden'));$('#closeSearch').onclick=()=>setSearchOpen(false);
 const searchEndpoint='https://nominatim.openstreetmap.org/search';
 async function searchPlaces(q,opts={}){
- const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'10',dedupe:'1',q,...opts});
+ const params=new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'40',dedupe:'0',q,...opts});
  const response=await fetch(searchEndpoint+'?'+params.toString(),{headers:{'Accept':'application/json'}});
  if(!response.ok)throw Error('Search failed');
  return response.json();
@@ -110,7 +110,12 @@ $('#search').onsubmit=async e=>{
   const near=userPos?{viewbox:[userPos[1]-.22,userPos[0]+.16,userPos[1]+.22,userPos[0]-.16].join(','),bounded:'0'}:{};
   const numbered=numberedAddress(q);
   let data=numbered?await searchNumberedAddress(q):await searchPlaces(q,near);
-  if(!numbered&&!data.length)data=await searchPlaces(q);
+  if(!numbered){
+   const globalMatches=await searchPlaces(q);
+   const unique=new Map();
+   for(const x of [...data,...globalMatches])unique.set(x.place_id||`${x.lat},${x.lon},${x.display_name}`,x);
+   data=[...unique.values()];
+  }
   if(userPos){data=data.filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)).sort((a,b)=>distanceM(userPos,[+a.lat,+a.lon])-distanceM(userPos,[+b.lat,+b.lon]));}
   results.replaceChildren();
   data.forEach(x=>{
