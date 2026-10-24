@@ -122,18 +122,14 @@ function numberedAddress(q){
  const match=first.match(/^(.+?)\s+(?:n[úu]mero\s*|n[º°.]?\s*)?(\d+[A-Za-z]?)$/i);
  return match?{road:match[1].trim(),number:match[2].toLowerCase(),city:parts.slice(1).join(', ')}:null;
 }
-async function searchPlaces(q){
- return searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',q}));
-}
+const streetSwaps=[[/^avenida\\b/i,'Avinguda'],[/^avinguda\\b/i,'Avenida'],[/^calle\\b/i,'Carrer'],[/^carrer\\b/i,'Calle'],[/^paseo\\b/i,'Passeig'],[/^passeig\\b/i,'Paseo'],[/^plaza\\b/i,'Plaça'],[/^plaça\\b/i,'Plaza'],[/^ronda\\b/i,'Ronda'],[/^carretera\\b/i,'Carretera']];
+function roadVariants(road){const variants=new Set([road]);for(const [re,to] of streetSwaps)if(re.test(road))variants.add(road.replace(re,to));return [...variants]}
+const normalizedRoad=v=>String(v||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/\\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\\s+/g,' ').trim();
+async function searchPlaces(q){const parts=q.split(',');const road=parts.shift().trim(),suffix=parts.join(',').trim();const queries=roadVariants(road).map(v=>[v,suffix].filter(Boolean).join(', '));const responses=await Promise.allSettled(queries.map(query=>searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',countrycodes:'es',q:query}))));return responses.flatMap(r=>r.status==='fulfilled'?r.value:[])}
 async function searchNumberedAddress(q){
  const a=numberedAddress(q);if(!a)return [];
- const city=a.city.split(',')[0]||'';
- const variants=new Set([a.road]);
- const swaps=[[/^avenida\b/i,'Avinguda'],[/^avinguda\b/i,'Avenida'],[/^calle\b/i,'Carrer'],[/^carrer\b/i,'Calle'],[/^paseo\b/i,'Passeig'],[/^passeig\b/i,'Paseo'],[/^plaza\b/i,'Plaça'],[/^plaça\b/i,'Plaza']];
- for(const [re,to] of swaps)if(re.test(a.road))variants.add(a.road.replace(re,to));
- const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
- const wanted=normalize(a.road),urls=new Set();
- for(const road of variants){
+ const city=a.city.split(',')[0]||'',urls=new Set(),wanted=normalizedRoad(a.road);
+ for(const road of roadVariants(a.road)){
   for(const query of [[road,a.number,city].filter(Boolean).join(', '),[a.number,road,city].filter(Boolean).join(' ')]){
    urls.add(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'30',countrycodes:'es',q:query}));
   }
@@ -141,15 +137,14 @@ async function searchNumberedAddress(q){
  }
  const responses=await Promise.allSettled([...urls].map(url=>searchFetch(url,6500)));
  const found=[],seen=new Set();
- for(const response of responses){
-  if(response.status!=='fulfilled')continue;
+ for(const response of responses){if(response.status!=='fulfilled')continue;
   for(const x of response.value||[]){
    const number=String(x.address?.house_number||'').trim().toLowerCase();
    if(number!==a.number)continue;
-   const road=normalize(x.address?.road||x.address?.pedestrian||x.address?.residential||'');
+   const road=normalizedRoad(x.address?.road||x.address?.pedestrian||x.address?.residential||'');
    if(road&&road!==wanted&&!road.includes(wanted)&&!wanted.includes(road))continue;
-   const place=normalize([x.address?.city,x.address?.town,x.address?.municipality,x.address?.village,x.display_name].filter(Boolean).join(' '));
-   if(city&&!place.includes(normalize(city)))continue;
+   const place=normalizedRoad([x.address?.city,x.address?.town,x.address?.municipality,x.address?.village,x.display_name].filter(Boolean).join(' '));
+   if(city&&!place.includes(normalizedRoad(city)))continue;
    const key=x.osm_type+':'+x.osm_id;
    if(!seen.has(key)){seen.add(key);found.push(x)}
   }
