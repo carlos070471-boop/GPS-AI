@@ -151,7 +151,7 @@ async function searchNumberedAddress(q){
  }
  for(const params of queries){
   let items=[];
-  try{items=await searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',countrycodes:'es',...params}),6500)}catch{continue}
+  try{items=await searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',countrycodes:'es',...params}),6500)}catch{await new Promise(resolve=>setTimeout(resolve,1100));continue}
   for(const x of items||[]){
    const number=String(x.address?.house_number||'').trim().toLowerCase();
    if(number!==a.number)continue;
