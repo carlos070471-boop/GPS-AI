@@ -22,6 +22,19 @@ jobs:
       - run: npm run build
       - run: npx cap add android
       - run: npx cap sync android
+      - name: Preparar icono Android con brújula
+        run: |
+          python3 -m pip install --quiet cairosvg
+          python3 - <<'PY'
+          import os, cairosvg
+          sizes={'mipmap-mdpi':48,'mipmap-hdpi':72,'mipmap-xhdpi':96,'mipmap-xxhdpi':144,'mipmap-xxxhdpi':192}
+          source='public/gps-ai-compass.svg'
+          for folder,size in sizes.items():
+              target=f'android/app/src/main/res/{folder}'
+              os.makedirs(target,exist_ok=True)
+              for name in ('ic_launcher.png','ic_launcher_round.png','ic_launcher_foreground.png'):
+                  cairosvg.svg2png(url=source,write_to=os.path.join(target,name),output_width=size,output_height=size)
+          PY
       - name: Voz nativa, permisos y Android Auto
         run: |
           cp native/MainActivity.java android/app/src/main/java/com/gpsai/app/MainActivity.java
