@@ -26,16 +26,23 @@ public class NativeVoicePlugin extends Plugin implements TextToSpeech.OnInitList
         tts.setLanguage(locale);
         tts.setSpeechRate(Math.max(.7f,Math.min(1.3f,rate)));
         boolean male=choice!=null&&choice.endsWith("-male");
+        // Android TTS voice names often contain opaque IDs, not gender labels.
+        // Prefer a matching gender when identifiable, but do not silence ALL speech
+        // just because the installed voice has an unrecognised name.
         Set<Voice> voices=tts.getVoices();
-        if(voices==null)return false;
+        if(voices==null||voices.isEmpty())return true; // Android default voice for locale
+        Voice fallback=null;
         for(Voice v:voices){
             if(v.getLocale()==null||!language.equals(v.getLocale().getLanguage()))continue;
+            if(fallback==null||(!v.isNetworkConnectionRequired()&&fallback.isNetworkConnectionRequired()))fallback=v;
             String n=v.getName().toLowerCase(Locale.ROOT);
             boolean looksFemale=n.contains("female")||n.contains("mujer")||n.contains("dona")||n.contains("maria")||n.contains("laura")||n.contains("sofia")||n.contains("paulina")||n.contains("helena");
             boolean looksMale=!looksFemale&&(n.contains("male")||n.contains("hombre")||n.contains("home")||n.contains("carlos")||n.contains("jorge")||n.contains("pablo")||n.contains("diego")||n.contains("joan")||n.contains("enric"));
-            if(male?looksMale:looksFemale){tts.setVoice(v);return true;}
+            if(male?looksMale:looksFemale){if(tts.setVoice(v)==TextToSpeech.SUCCESS)return true;}
         }
-        return false;
+        // Keep audio working with the locale default even if gender cannot be guaranteed.
+        if(fallback!=null)tts.setVoice(fallback);
+        return true;
     }
     @PluginMethod public void speak(PluginCall call){String text=call.getString("text","");String voice=call.getString("voice","es-ES-female");Double r=call.getDouble("rate",1.0);if(!ready||tts==null){call.reject("Motor de voz no disponible");return;}if(!configure(voice,r.floatValue())){call.reject("No hay una voz compatible instalada para esta selección");return;}Bundle b=new Bundle();int result=tts.speak(text,TextToSpeech.QUEUE_FLUSH,b,"gpsai-"+System.currentTimeMillis());if(result==TextToSpeech.ERROR)call.reject("No se pudo reproducir la voz");else call.resolve();}
     @PluginMethod public void speakAndWait(PluginCall call){
