@@ -125,7 +125,20 @@ function numberedAddress(q){
 const streetSwaps=[[/^avenida\b/i,'Avinguda'],[/^avinguda\b/i,'Avenida'],[/^calle\b/i,'Carrer'],[/^carrer\b/i,'Calle'],[/^paseo\b/i,'Passeig'],[/^passeig\b/i,'Paseo'],[/^plaza\b/i,'Plaça'],[/^plaça\b/i,'Plaza'],[/^ronda\b/i,'Ronda'],[/^carretera\b/i,'Carretera']];
 function roadVariants(road){const variants=new Set([road]);for(const [re,to] of streetSwaps)if(re.test(road))variants.add(road.replace(re,to));return [...variants]}
 const normalizedRoad=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-async function searchPlaces(q){const parts=q.split(',');const road=parts.shift().trim(),suffix=parts.join(',').trim();const queries=roadVariants(road).map(v=>[v,suffix].filter(Boolean).join(', '));const responses=await Promise.allSettled(queries.map(query=>searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',countrycodes:'es',q:query}))));return responses.flatMap(r=>r.status==='fulfilled'?r.value:[])}
+async function searchPlaces(q){
+ const parts=q.split(','),road=parts.shift().trim(),suffix=parts.join(',').trim();
+ const queries=roadVariants(road).map(v=>[v,suffix].filter(Boolean).join(', '));
+ const results=[],seen=new Set();
+ for(let i=0;i<queries.length;i++){
+  if(i)await new Promise(resolve=>setTimeout(resolve,1100));
+  try{
+   const items=await searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',countrycodes:'es',q:queries[i]}));
+   for(const item of items||[]){const key=item.place_id||item.osm_type+':'+item.osm_id;if(!seen.has(key)){seen.add(key);results.push(item)}}
+  }catch{}
+  if(results.length)break;
+ }
+ return results;
+}
 async function searchNumberedAddress(q){
  const a=numberedAddress(q);if(!a)return [];
  const city=a.city.split(',')[0]||'',wanted=normalizedRoad(a.road);
