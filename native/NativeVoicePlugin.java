@@ -18,20 +18,30 @@ public class NativeVoicePlugin extends Plugin implements TextToSpeech.OnInitList
     private boolean ready=false;
     @Override public void load(){ tts=new TextToSpeech(getContext(),this); }
     @Override public void onInit(int status){ ready=status==TextToSpeech.SUCCESS; if(ready){tts.setSpeechRate(1f);tts.setPitch(1f);} }
-    private void configure(String choice,float rate){
-        if(tts==null)return;
-        Locale locale=choice!=null&&choice.startsWith("es-CO")?new Locale("es","CO"):new Locale("es","ES");
-        tts.setLanguage(locale);tts.setSpeechRate(Math.max(.7f,Math.min(1.3f,rate)));
-        boolean male=choice!=null&&choice.endsWith("male");
-        Set<Voice> voices=tts.getVoices();Voice fallback=null;
-        if(voices!=null)for(Voice v:voices){if(v.getLocale()!=null&&v.getLocale().getLanguage().equals("es")){if(fallback==null)fallback=v;String n=v.getName().toLowerCase();boolean looksMale=n.contains("male")||n.contains("hombre")||n.contains("carlos")||n.contains("jorge")||n.contains("pablo")||n.contains("diego");boolean looksFemale=n.contains("female")||n.contains("mujer")||n.contains("maria")||n.contains("laura")||n.contains("sofia")||n.contains("paulina");if((male&&looksMale)||(!male&&looksFemale)){tts.setVoice(v);return;}}}
-        if(fallback!=null)tts.setVoice(fallback);
+    private boolean configure(String choice,float rate){
+        if(tts==null)return false;
+        String language=choice!=null&&choice.startsWith("ca-")?"ca":"es";
+        Locale locale=new Locale(language,"ES");
+        if(tts.isLanguageAvailable(locale)<TextToSpeech.LANG_AVAILABLE)return false;
+        tts.setLanguage(locale);
+        tts.setSpeechRate(Math.max(.7f,Math.min(1.3f,rate)));
+        boolean male=choice!=null&&choice.endsWith("-male");
+        Set<Voice> voices=tts.getVoices();
+        if(voices==null)return false;
+        for(Voice v:voices){
+            if(v.getLocale()==null||!language.equals(v.getLocale().getLanguage()))continue;
+            String n=v.getName().toLowerCase(Locale.ROOT);
+            boolean looksFemale=n.contains("female")||n.contains("mujer")||n.contains("dona")||n.contains("maria")||n.contains("laura")||n.contains("sofia")||n.contains("paulina")||n.contains("helena");
+            boolean looksMale=!looksFemale&&(n.contains("male")||n.contains("hombre")||n.contains("home")||n.contains("carlos")||n.contains("jorge")||n.contains("pablo")||n.contains("diego")||n.contains("joan")||n.contains("enric"));
+            if(male?looksMale:looksFemale){tts.setVoice(v);return true;}
+        }
+        return false;
     }
-    @PluginMethod public void speak(PluginCall call){String text=call.getString("text","");String voice=call.getString("voice","es-ES-female");Double r=call.getDouble("rate",1.0);if(!ready||tts==null){call.reject("Motor de voz no disponible");return;}configure(voice,r.floatValue());Bundle b=new Bundle();int result=tts.speak(text,TextToSpeech.QUEUE_FLUSH,b,"gpsai-"+System.currentTimeMillis());if(result==TextToSpeech.ERROR)call.reject("No se pudo reproducir la voz");else call.resolve();}
+    @PluginMethod public void speak(PluginCall call){String text=call.getString("text","");String voice=call.getString("voice","es-ES-female");Double r=call.getDouble("rate",1.0);if(!ready||tts==null){call.reject("Motor de voz no disponible");return;}if(!configure(voice,r.floatValue())){call.reject("No hay una voz compatible instalada para esta selección");return;}Bundle b=new Bundle();int result=tts.speak(text,TextToSpeech.QUEUE_FLUSH,b,"gpsai-"+System.currentTimeMillis());if(result==TextToSpeech.ERROR)call.reject("No se pudo reproducir la voz");else call.resolve();}
     @PluginMethod public void speakAndWait(PluginCall call){
         String text=call.getString("text","");String voice=call.getString("voice","es-ES-female");Double rate=call.getDouble("rate",1.0);
         if(!ready||tts==null){call.reject("Motor de voz no disponible");return;}
-        configure(voice,rate.floatValue());
+        if(!configure(voice,rate.floatValue())){call.reject("No hay una voz compatible instalada para esta selección");return;}
         String id="weather-"+System.nanoTime();
         tts.setOnUtteranceProgressListener(new UtteranceProgressListener(){
             @Override public void onStart(String utteranceId){}
