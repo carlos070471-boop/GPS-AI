@@ -22,10 +22,10 @@ function installVoiceSettings(){
   const lang=panel.querySelector('#gpsVoiceLang'),gender=panel.querySelector('#gpsVoiceGender'),volume=panel.querySelector('#gpsVoiceVolume'),status=panel.querySelector('#gpsVoiceStatus');
   lang.value=voicePrefs.lang;gender.value=voicePrefs.gender;volume.value=Math.round(voicePrefs.volume*100);
   const choice=()=>({lang:lang.value,gender:gender.value,volume:Number(volume.value)/100});
-  const preview=()=>{const c=choice();window.GPSAIVoiceChoice=c.lang+'-'+c.gender;const u=new SpeechSynthesisUtterance(c.lang==='ca-ES'?'Aquesta és la veu de navegació.':'Esta es la voz de navegación.');u.lang=c.lang;u.volume=c.volume;u.voice=availableVoiceFor(c.lang,c.gender);window.speechSynthesis.cancel();window.speechSynthesis.speak(u);};
+  const preview=()=>{const c=choice();window.GPSAIVoiceChoice=c.lang+'-'+c.gender;const u=new SpeechSynthesisUtterance(c.lang==='ca-ES'?'Aquesta és la veu de navegació.':'Esta es la voz de navegación.');u.lang=c.lang;u.volume=c.volume;u.voice=availableVoiceFor(c.lang,c.gender);u.onerror=()=>{status.textContent='No hay una voz compatible instalada para esta selección.';};status.textContent='';window.speechSynthesis.cancel();window.speechSynthesis.speak(u);};
   panel.querySelector('#gpsVoiceTest').onclick=preview;
   panel.querySelector('#gpsVoiceSave').onclick=()=>{const c=choice();Object.assign(voicePrefs,c);window.GPSAIVoiceChoice=c.lang+'-'+c.gender;localStorage.setItem('gpsai-voice',JSON.stringify(voicePrefs));status.textContent='Voz seleccionada y guardada';};
-  panel.querySelector('#gpsVoiceClose').onclick=()=>panel.remove();
+  panel.querySelector('#gpsVoiceClose').onclick=()=>{window.GPSAIVoiceChoice=voicePrefs.lang+'-'+voicePrefs.gender;panel.remove();};
   menu.classList.add('hidden');
  };
 }
