@@ -185,3 +185,5 @@ body > #savedMenu .savedGo{font-size:14px;line-height:1.35;overflow-wrap:anywher
 body:not(.trip-active) #routeCard:not(.hidden){z-index:3200!important;isolation:isolate}
 body.trip-active #routeCard{z-index:2000!important;pointer-events:none}
 body.trip-active #routeCard #cancelNav{pointer-events:auto}
+
+#gpsaiVoicePanel select{font-size:18px;min-height:48px;max-width:100%}#gpsaiVoicePanel .gps-voice-actions{display:flex;flex-wrap:wrap;gap:10px}#gpsaiVoicePanel .gps-voice-actions button{min-height:54px;padding:12px 16px;font-size:17px;font-weight:700;border-radius:12px;border:1px solid #aaa;background:#f5f5f5}#gpsVoiceSave{background:#dce9ff!important}
