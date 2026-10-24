@@ -17,5 +17,5 @@ function onPosition(d={}){if(!Number.isFinite(d.lat)||!Number.isFinite(d.lon))re
 window.addEventListener('gpsai-position',e=>onPosition(e.detail||{}));
 if(navigator.geolocation)navigator.geolocation.watchPosition(p=>onPosition({lat:p.coords.latitude,lon:p.coords.longitude,heading:p.coords.heading,speed:p.coords.speed}),()=>{},{enableHighAccuracy:true,maximumAge:2000,timeout:10000});
 
-function attachLightZoom(){const m=map();if(!m){setTimeout(attachLightZoom,400);return}m.on('zoomend',paintLights)}
+function attachLightZoom(){const m=map();if(!m){setTimeout(attachLightZoom,400);return}m.on('zoom',()=>{const size=lightSize();trafficLightMarkers.forEach(marker=>{const el=marker.getElement();if(!el)return;el.style.width=size+'px';el.style.height=size+'px';el.style.marginLeft=-(size/2)+'px';el.style.marginTop=-(size/2)+'px';const span=el.querySelector('span');if(span){span.style.fontSize=size+'px';span.style.lineHeight=size+'px'}})});m.on('zoomend',paintLights)}
 attachLightZoom();
