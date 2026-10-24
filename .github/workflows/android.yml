@@ -2,8 +2,6 @@ name: Compilar APK GPS AI
 # Compilación solicitada para probar los últimos cambios visuales y avisos.
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 concurrency:
   group: gps-ai-apk-main
   cancel-in-progress: true
