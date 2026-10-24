@@ -122,9 +122,9 @@ function numberedAddress(q){
  const match=first.match(/^(.+?)\s+(?:n[úu]mero\s*|n[º°.]?\s*)?(\d+[A-Za-z]?)$/i);
  return match?{road:match[1].trim(),number:match[2].toLowerCase(),city:parts.slice(1).join(', ')}:null;
 }
-const streetSwaps=[[/^avenida\\b/i,'Avinguda'],[/^avinguda\\b/i,'Avenida'],[/^calle\\b/i,'Carrer'],[/^carrer\\b/i,'Calle'],[/^paseo\\b/i,'Passeig'],[/^passeig\\b/i,'Paseo'],[/^plaza\\b/i,'Plaça'],[/^plaça\\b/i,'Plaza'],[/^ronda\\b/i,'Ronda'],[/^carretera\\b/i,'Carretera']];
+const streetSwaps=[[/^avenida\b/i,'Avinguda'],[/^avinguda\b/i,'Avenida'],[/^calle\b/i,'Carrer'],[/^carrer\b/i,'Calle'],[/^paseo\b/i,'Passeig'],[/^passeig\b/i,'Paseo'],[/^plaza\b/i,'Plaça'],[/^plaça\b/i,'Plaza'],[/^ronda\b/i,'Ronda'],[/^carretera\b/i,'Carretera']];
 function roadVariants(road){const variants=new Set([road]);for(const [re,to] of streetSwaps)if(re.test(road))variants.add(road.replace(re,to));return [...variants]}
-const normalizedRoad=v=>String(v||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/\\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\\s+/g,' ').trim();
+const normalizedRoad=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\b(avenida|avinguda|calle|carrer|plaza|placa|paseo|passeig|de|del|dels|la|el)\b/g,' ').replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
 async function searchPlaces(q){const parts=q.split(',');const road=parts.shift().trim(),suffix=parts.join(',').trim();const queries=roadVariants(road).map(v=>[v,suffix].filter(Boolean).join(', '));const responses=await Promise.allSettled(queries.map(query=>searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',countrycodes:'es',q:query}))));return responses.flatMap(r=>r.status==='fulfilled'?r.value:[])}
 async function searchNumberedAddress(q){
  const a=numberedAddress(q);if(!a)return [];
