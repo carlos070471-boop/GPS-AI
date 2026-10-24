@@ -128,17 +128,18 @@ const normalizedRoad=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/
 async function searchPlaces(q){const parts=q.split(',');const road=parts.shift().trim(),suffix=parts.join(',').trim();const queries=roadVariants(road).map(v=>[v,suffix].filter(Boolean).join(', '));const responses=await Promise.allSettled(queries.map(query=>searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',namedetails:'1',limit:'30',dedupe:'1',countrycodes:'es',q:query}))));return responses.flatMap(r=>r.status==='fulfilled'?r.value:[])}
 async function searchNumberedAddress(q){
  const a=numberedAddress(q);if(!a)return [];
- const city=a.city.split(',')[0]||'',urls=new Set(),wanted=normalizedRoad(a.road);
- for(const road of roadVariants(a.road)){
-  for(const query of [[road,a.number,city].filter(Boolean).join(', '),[a.number,road,city].filter(Boolean).join(' ')]){
-   urls.add(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'30',countrycodes:'es',q:query}));
-  }
-  urls.add(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'30',countrycodes:'es',street:a.number+' '+road,...(city?{city}:{})}));
+ const city=a.city.split(',')[0]||'',wanted=normalizedRoad(a.road);
+ const variants=roadVariants(a.road),found=[],seen=new Set();
+ // Consultas secuenciales: el servicio público de Nominatim limita las peticiones.
+ const queries=[];
+ for(const road of variants){
+  queries.push({street:a.number+' '+road,...(city?{city}:{})});
+  queries.push({q:[road,a.number,city].filter(Boolean).join(', ')});
  }
- const responses=await Promise.allSettled([...urls].map(url=>searchFetch(url,6500)));
- const found=[],seen=new Set();
- for(const response of responses){if(response.status!=='fulfilled')continue;
-  for(const x of response.value||[]){
+ for(const params of queries){
+  let items=[];
+  try{items=await searchFetch(searchEndpoint+'?'+new URLSearchParams({format:'jsonv2',addressdetails:'1',limit:'20',countrycodes:'es',...params}),6500)}catch{continue}
+  for(const x of items||[]){
    const number=String(x.address?.house_number||'').trim().toLowerCase();
    if(number!==a.number)continue;
    const road=normalizedRoad(x.address?.road||x.address?.pedestrian||x.address?.residential||'');
@@ -148,6 +149,8 @@ async function searchNumberedAddress(q){
    const key=x.osm_type+':'+x.osm_id;
    if(!seen.has(key)){seen.add(key);found.push(x)}
   }
+  if(found.length)break;
+  await new Promise(resolve=>setTimeout(resolve,1100));
  }
  return found;
 }
