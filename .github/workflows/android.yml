@@ -32,8 +32,10 @@ jobs:
           for folder,size in sizes.items():
               target=f'android/app/src/main/res/{folder}'
               os.makedirs(target,exist_ok=True)
-              for name in ('ic_launcher.png','ic_launcher_round.png','ic_launcher_foreground.png'):
+              for name in ('ic_launcher.png','ic_launcher_round.png'):
                   cairosvg.svg2png(url=source,write_to=os.path.join(target,name),output_width=size,output_height=size)
+              # El icono adaptativo usa una capa de primer plano separada.
+              cairosvg.svg2png(url=source,write_to=os.path.join(target,'ic_launcher_foreground.png'),output_width=size*2,output_height=size*2)
           PY
       - name: Voz nativa, permisos y Android Auto
         run: |
