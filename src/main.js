@@ -159,7 +159,7 @@ async function searchNumberedAddress(q){
    if(road&&road!==wanted&&!road.includes(wanted)&&!wanted.includes(road))continue;
    const place=normalizedRoad([x.address?.city,x.address?.town,x.address?.municipality,x.address?.village,x.display_name].filter(Boolean).join(' '));
    if(city&&!place.includes(normalizedRoad(city)))continue;
-   const key=x.osm_type+':'+x.osm_id;
+   const key=x.osm_type&&x.osm_id?x.osm_type+':'+x.osm_id:[x.lat,x.lon,x.display_name].join(':');
    if(!seen.has(key)){seen.add(key);found.push(x)}
   }
   if(found.length)break;
